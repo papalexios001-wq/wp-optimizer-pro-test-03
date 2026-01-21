@@ -1,6 +1,6 @@
 // CTA LINKS, FAQ ACCORDION, SCHEMA MARKUP & YOUTUBE VIDEO INTEGRATION
-// WP Optimizer Pro v30.0 - Enterprise SOTA Implementation
-// SOTA UI/UX Components with Modern Design System
+// WP Optimizer Pro v4.0.0 - Enterprise SOTA Implementation
+// SOTA UI/UX Components with Modern Design System & Video Discovery
 
 // ========================
 // CTA BOX WITH LINKED TEXT
@@ -56,7 +56,7 @@ export function createCTABox(config: CTABoxConfig): string {
         font-size: 16px;
         box-shadow: 0 8px 24px rgba(0,0,0,0.15);
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 32px rgba(0,0,0,0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 8px 24px rgba(0,0,0,0.15)';">
+      ">
         ${buttonText}
         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
       </a>
@@ -99,7 +99,7 @@ export function createEnterpriseAccordion(items: FAQItem[], title: string = 'ðŸ’
       border-radius: 16px;
       overflow: hidden;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    " onmouseover="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 10px 30px rgba(59, 130, 246, 0.1)';" onmouseout="this.style.borderColor='#e5e7eb'; this.style.boxShadow='none';">
+    ">
       <summary style="
         padding: 24px 28px;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -111,7 +111,6 @@ export function createEnterpriseAccordion(items: FAQItem[], title: string = 'ðŸ’
         display: flex;
         align-items: center;
         gap: 16px;
-        transition: all 0.3s ease;
       ">
         <span style="
           display: flex;
@@ -188,27 +187,44 @@ export function createReferencesSection(references: Reference[]): string {
 // YOUTUBE VIDEO INTEGRATION - SOTA
 // ========================
 
-export function integrateYouTubeVideoIntoContent(
-  htmlContent: string,
-  videoId: string,
-  timestamp?: string,
-  title?: string
-): string {
-  if (!videoId) return htmlContent;
-  
-  const embedUrl = `https://www.youtube.com/embed/${videoId}${timestamp ? `?start=${timestamp}` : ''}`;
-  
-  const videoEmbed = `<div class="sota-video-embed" style="
-    margin: 48px 0;
+export interface YouTubeVideoData {
+  id: string;
+  title: string;
+  url: string;
+  channel?: string;
+  thumbnail?: string;
+}
+
+// Create SOTA video embed with modern styling and schema markup
+export function createVideoEmbed(videoId: string, title: string): string {
+  return `
+<section class="sota-video-section" style="
+  margin: 48px 0;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  padding: 40px;
+  border-radius: 20px;
+">
+  <h3 style="
+    color: #e94560;
+    font-size: 24px;
+    margin: 0 0 8px 0;
+    font-weight: 800;
+  ">ðŸŽ¬ Watch & Learn</h3>
+  <p style="
+    color: rgba(255,255,255,0.8);
+    margin: 0 0 24px 0;
+    font-size: 16px;
+  ">${title}</p>
+  <div style="
     position: relative;
-    width: 100%;
     padding-bottom: 56.25%;
     height: 0;
+    border-radius: 12px;
     overflow: hidden;
-    border-radius: 16px;
-    box-shadow: 0 10px 40px rgba(102, 126, 234, 0.15);
+    box-shadow: 0 20px 60px rgba(233,69,96,0.3);
   ">
-    <iframe
+    <iframe 
+      src="https://www.youtube.com/embed/${videoId}?rel=0" 
       style="
         position: absolute;
         top: 0;
@@ -216,18 +232,117 @@ export function integrateYouTubeVideoIntoContent(
         width: 100%;
         height: 100%;
         border: none;
-        border-radius: 16px;
-      "
-      src="${embedUrl}"
-      title="${title || 'YouTube video'}"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowFullScreen>
-    </iframe>
-  </div>`;
-  
-  return htmlContent + videoEmbed;
+      " 
+      allowfullscreen 
+      loading="lazy"
+      title="${title}"
+    ></iframe>
+  </div>
+</section>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"VideoObject","name":"${title}","embedUrl":"https://www.youtube.com/embed/${videoId}","thumbnailUrl":"https://img.youtube.com/vi/${videoId}/maxresdefault.jpg"}
+</script>`;
 }
 
+// Smart video insertion after first H2
+export function insertVideoAfterFirstH2(htmlContent: string, videoId: string, title: string): string {
+  const videoHtml = createVideoEmbed(videoId, title);
+  const h2Match = htmlContent.match(/<\/h2>/i);
+  
+  if (h2Match && h2Match.index !== undefined) {
+    const position = h2Match.index + 5;
+    return htmlContent.slice(0, position) + videoHtml + htmlContent.slice(position);
+  }
+  
+  // Fallback: append at end if no H2 found
+  return htmlContent + videoHtml;
+}
 
+// Discover YouTube video via Serper API
+export async function discoverYouTubeVideo(
+  keyword: string,
+  serperApiKey: string
+): Promise<YouTubeVideoData | null> {
+  try {
+    const response = await fetch('https://google.serper.dev/videos', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': serperApiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        q: `${keyword} tutorial guide how to`,
+        num: 5
+      })
+    });
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    const videos = data.videos || [];
+    
+    // Find best YouTube video
+    for (const video of videos) {
+      if (video.link && video.link.includes('youtube.com/watch')) {
+        const videoIdMatch = video.link.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+        if (videoIdMatch) {
+          return {
+            id: videoIdMatch[1],
+            title: video.title || keyword,
+            url: video.link,
+            channel: video.channel,
+            thumbnail: `https://img.youtube.com/vi/${videoIdMatch[1]}/maxresdefault.jpg`
+          };
+        }
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('YouTube discovery failed:', error);
+    return null;
+  }
+}
 
-export default { createCTABox, createEnterpriseAccordion , createReferencesSection, integrateYouTubeVideoIntoContent };
+// Main function: Discover and integrate YouTube video
+export async function discoverAndIntegrateYouTubeVideo(
+  keyword: string,
+  htmlContent: string,
+  serperApiKey: string
+): Promise<{ content: string; videoData: YouTubeVideoData | null }> {
+  const videoData = await discoverYouTubeVideo(keyword, serperApiKey);
+  
+  if (!videoData) {
+    return { content: htmlContent, videoData: null };
+  }
+  
+  const enrichedContent = insertVideoAfterFirstH2(
+    htmlContent,
+    videoData.id,
+    videoData.title
+  );
+  
+  return { content: enrichedContent, videoData };
+}
+
+// Legacy function for backward compatibility
+export function integrateYouTubeVideoIntoContent(
+  htmlContent: string,
+  videoId: string,
+  timestamp?: string,
+  title?: string
+): string {
+  if (!videoId) return htmlContent;
+  return insertVideoAfterFirstH2(htmlContent, videoId, title || 'Related Video');
+}
+
+export default {
+  createCTABox,
+  createEnterpriseAccordion,
+  createReferencesSection,
+  createVideoEmbed,
+  insertVideoAfterFirstH2,
+  discoverYouTubeVideo,
+  discoverAndIntegrateYouTubeVideo,
+  integrateYouTubeVideoIntoContent
+};
